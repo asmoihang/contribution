@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据</title>
+    <!-- 引入Layui的CSS文件 -->
+    <link rel="stylesheet" href="https://cdn.staticfile.org/layui/2.9.7/css/layui.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* 定义按钮样式 */
+        .icon-button {
+            background-color: transparent; /* 设置背景为透明 */
+            border: none; /* 清除边框 */
+            cursor: pointer; /* 设置鼠标样式为手型 */
+            /* padding: 12px; 设置内边距 */
+            margin: 0; /* 清除外边距 */
+            width: 36px; /* 设置宽度 */
+            height: 36px; /* 设置高度 */
+        }
+
+        /* 设置图标大小 */
+        .icon {
+            width: 24px; /* 设置宽度 */
+            height: 24px; /* 设置高度 */
+            fill: currentColor; /* 使用当前文本颜色填充图标 */
+        }
+        
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            z-index: 1000;
+          }
+    </style>
+</head>
+<body>
+
+<div class="layui-container" id="header">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <ul class="layui-nav layui-bg-green" lay-filter="type">
+                <li class="layui-nav-item layui-this">
+                  <a href="javascript:;">成员管理</a>
+                </li>
+                <li class="layui-nav-item" >
+                    <a href="javascript:;">福利排名前15名单</a>
+                </li>
+                <li class="layui-nav-item">
+                    <a href="javascript:;">当月入团满福利名单</a>
+                </li>
+              </ul>
+        </div>
+    </div>
+</div>
+<div class="layui-container">
+    <div class="layui-row">
+        <div class="layui-col-md12">
+            <table class="layui-hide" id="goods" lay-filter="goods"></table>
+        </div>
+    </div>
+<div>
+
+<script type="text/html" id="barBuy">
+    <div class="layui-clear-space">
+        <button class="icon-button">
+            <i class="icon fas fa-shopping-cart" lay-event="buy"></i>
+        </button>
+    </div>
+</script> 
+<script type="text/html" id="barSell">
+    <div class="layui-clear-space">
+        <button class="icon-button">
+            <i class="icon fas fa-hand-holding-usd" lay-event="sell"></i>
+        </button>
+    </div>
+</script> 
+<script type="text/html" id="barReport">
+    <div class="layui-clear-space">
+        <button class="icon-button">
+            <i class="icon fas fa-chart-line" lay-event="view"></i>
+        </button>
+    </div>
+</script> 
+
+
+
+<!-- 引入Layui的JS文件 -->
+<script src="https://cdn.staticfile.org/layui/2.9.8/layui.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" integrity="sha256-QvgynZibb2U53SsVu98NggJXYqwRL7tg3FeyfXvPOUY=" crossorigin="anonymous"></script>
+<script>
+    layui.use(['table'], function() {
+        var table = layui.table;
+        var element = layui.element;
+        var form = layui.form;
+        var $ = layui.$;
+        var util = layui.util;
+        // 创建渲染实例
+        table.render({
+            elem: '#goods',
+            url: 'pricetable',
+            height: function(){
+                var otherHeight = $('#header').outerHeight(); // 自定义其他区域的高度
+                return $(window).height() - otherHeight - 12; // 返回 number 类型
+            },
+            cellMinWidth: 80,
+            editTrigger: 'dblclick',
+            cols: [[
+                {field:'name', fixed:'left', width:200, 'title': '角色名'} ,
+                {field:'count', width:130, title:'入团时间', unresize: true, align: 'center', templet: '#countInput'},
+                {field:'purchase_price', width:130, title:'福利完成数', edit: 'text', align: 'center'},
+                {field:'sale_price', width:120, title:'贡献度', edit: 'text', sort: true},
+                {field:'aver_price', width:120, title:'漏做福利数'},
+                {field:'total_price', width:120, title:'当月总福利数'},
+                {field:'profit', width:120, title:'是否满福利', fixed: 'right'},
+            ]],
+            css: [
+                // 对开启了编辑的单元格追加样式
+                '.layui-table-view td[data-edit]{color: #16B777;}',
+                '.layui-table input{text-align: center; width: 100%; height:100%;}'
+            ].join(''),
+            done: function(res, curr, count) {
+                var options = this;
+      
+                // 获取当前行数据
+                table.getRowData = function(tableId, elem) {
+                  var index = $(elem).closest('tr').data('index');
+                  return table.cache[tableId][index] || {};
+                };
+                
+                table.getInputData = function(tableId, elem, inputId) {
+                    return $(elem).closest('tr').find('input[id=' + inputId + ']').val();
+                }
+                
+                // 单元格工具栏事件
+                table.on('tool(goods)', function(obj) {
+                    var layEvent = obj.event;
+                    var data = obj.data;
+                    var name = data.name;
+                    
+                    if (layEvent === "sell") {
+                        var count = parseInt(obj.tr.find('#count').val());
+                        //var count = parseInt(table.getInputData(options.id, this, "count"));
+                        console.log(count);
+                        var msg = {
+                            "name": name,
+                            "count": count
+                        };
+                        fetch('http://localhost:8888/members', {
+                            method: 'Post',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(msg)
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw Error('response not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(rsp_data => {
+
+                        })
+                        .catch(error => {
+                            console.error(error);
+                        })
+                    }
+                    else {
+ 
+                    }
+                });
+            },
+            complete: function(xhr, ts) {
+
+            }
+        });
+        // 行单击事件( 双击事件为: rowDouble )
+       // table.on('row(goods)', function(obj){
+       //     var data = obj.data; // 获取当前行数据
+       //     
+       //     // 标注当前点击行的选中状态
+       //     obj.setRowChecked({
+       //     type: 'radio' // radio 单选模式；checkbox 复选模式
+       //     });
+       // });
+   
+        // 单元格编辑事件
+        table.on('edit(goods)', function(obj) {
+            var value = parseFloat(obj.value); // 修改后的值
+            var msg = {
+                "name": obj.data.name,
+                "sale_price": value
+            };
+            fetch('http://localhost:8889/members', {
+                method: 'Post',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(msg)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw Error('response not ok');
+                }
+                return response.json();
+            })
+            .then(rsp_data => {
+                msg = '价格修改成功'
+                // 显示
+                layer.msg(msg, {
+                    offset: '65px'
+                });
+            })
+            .catch(error => {
+                console.error(error);
+            });
+        });
+                
+        element.on('nav(type)', function(elem) {
+            type = elem.text();
+            table.reload('goods', {
+                url: 'ranking?type=' + type,
+                height: function() {
+                    var otherHeight = $('#header').outerHeight(); // 自定义其他区域的高度
+                    return $(window).height() - otherHeight - 12; // 返回 number 类型
+                }
+            });
+            table.resize('goods');
+        });
+    });
+</script>
+</body>
+</html>
