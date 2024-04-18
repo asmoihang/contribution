@@ -56,36 +56,68 @@
         </div>
     </div>
 </div>
+
 <div class="layui-container">
     <div class="layui-row">
         <div class="layui-col-md12">
-            <table class="layui-hide" id="goods" lay-filter="goods"></table>
+            <table class="layui-hide" id="members" lay-filter="members"></table>
         </div>
     </div>
 <div>
 
-<script type="text/html" id="barBuy">
+<script type="text/html" id="barDel">
     <div class="layui-clear-space">
         <button class="icon-button">
-            <i class="icon fas fa-shopping-cart" lay-event="buy"></i>
-        </button>
-    </div>
-</script> 
-<script type="text/html" id="barSell">
-    <div class="layui-clear-space">
-        <button class="icon-button">
-            <i class="icon fas fa-hand-holding-usd" lay-event="sell"></i>
-        </button>
-    </div>
-</script> 
-<script type="text/html" id="barReport">
-    <div class="layui-clear-space">
-        <button class="icon-button">
-            <i class="icon fas fa-chart-line" lay-event="view"></i>
+            <i class="icon fas fa-hand-holding-usd" lay-event="delete"></i>
         </button>
     </div>
 </script> 
 
+<script type="text/html" id="toolbar">
+    <div class="layui-btn-container">
+      <button class="layui-btn layui-btn-sm" lay-event="add-member">添加成员</button>
+    </div>
+</script>
+
+<form class="layui-form layui-form-pane popup" action="" style="display: none;" id="add-member-form">
+    <div class="layui-form-item">
+    <div class="layui-input-wrap">
+        <div class="layui-input-prefix">
+            <i class="layui-icon layui-icon-username"></i>
+        </div>
+        <input type="text" name="name" autocomplete="off" placeholder="请输入角色名称" lay-verify="required" class="layui-input">
+      </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-input-wrap">
+            <div class="layui-input-prefix">
+              <i class="layui-icon layui-icon-date"></i>
+            </div>
+            <input type="text" name="join_date" placeholder="入团时间" class="layui-input demo-search-date">
+            <div class="layui-input-suffix">
+              <i class="layui-icon layui-icon-down"></i>
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+        <div class="layui-inline">
+            <label class="layui-form-label">贡献度</label>
+            <div class="layui-input-block">
+                <input type="number" id="date1" name="contribution" required autocomplete="off" class="layui-input">
+            </div>
+            </div>
+            <div class="layui-inline">
+            <label class="layui-form-label">福利数</label>
+            <div class="layui-input-inline">
+                <input type="number" name="welfarenum" required autocomplete="off" class="layui-input">
+            </div>
+        </div>
+    </div>
+    <div class="layui-form-item">
+      <button class="layui-btn" lay-submit lay-filter="add-member-submit">确认</button>
+      <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+    </div>
+  </form>
 
 
 <!-- 引入Layui的JS文件 -->
@@ -98,24 +130,28 @@
         var form = layui.form;
         var $ = layui.$;
         var util = layui.util;
+        var laydate = layui.laydate;
         // 创建渲染实例
         table.render({
-            elem: '#goods',
-            url: 'pricetable',
+            elem: '#members',
+            url: 'members',
             height: function(){
                 var otherHeight = $('#header').outerHeight(); // 自定义其他区域的高度
                 return $(window).height() - otherHeight - 12; // 返回 number 类型
             },
+            toolbar: '#toolbar',
             cellMinWidth: 80,
             editTrigger: 'dblclick',
             cols: [[
                 {field:'name', fixed:'left', width:200, 'title': '角色名'} ,
-                {field:'count', width:130, title:'入团时间', unresize: true, align: 'center', templet: '#countInput'},
-                {field:'purchase_price', width:130, title:'福利完成数', edit: 'text', align: 'center'},
-                {field:'sale_price', width:120, title:'贡献度', edit: 'text', sort: true},
-                {field:'aver_price', width:120, title:'漏做福利数'},
-                {field:'total_price', width:120, title:'当月总福利数'},
-                {field:'profit', width:120, title:'是否满福利', fixed: 'right'},
+                {field:'date', width:130, title:'入团时间', unresize: true, align: 'center', templet: '#countInput'},
+                {field:'welfare_completed', width:130, title:'福利完成数', edit: 'text', align: 'center'},
+                {field:'contribution', width:120, title:'贡献度', edit: 'text', sort: true},
+                {field:'less_completed_welfare', width:120, title:'漏做福利数'},
+                {field:'total_welfare_of_5_days', width:120, title:'当月五天福利数'},
+                {field:'total_welfare', width:120, title:'当月总福利数'},
+                {field:'completed_5_days_welfare', width:120, title:'是否五天满福利', fixed: 'right'},
+                {field:'full_completed_welfare', width:120, title:'是否满福利', fixed: 'right'},
             ]],
             css: [
                 // 对开启了编辑的单元格追加样式
@@ -189,7 +225,7 @@
        // });
    
         // 单元格编辑事件
-        table.on('edit(goods)', function(obj) {
+        table.on('edit(members)', function(obj) {
             var value = parseFloat(obj.value); // 修改后的值
             var msg = {
                 "name": obj.data.name,
@@ -219,6 +255,24 @@
                 console.error(error);
             });
         });
+        // 工具栏事件
+        table.on('toolbar(members)', function(obj){
+                var id = obj.config.id;
+                var checkStatus = table.checkStatus(id);
+                var othis = lay(this);
+                switch(obj.event){
+                case 'add-member':
+                    layer.open({
+                        title: '添加',
+                        type: 1,
+                        area: ['40%','50%'],
+                        shadeClose: true,
+                        closeBtn: 0,
+                        content: $('#add-member-form')
+                    });
+                break;
+            };
+        });
                 
         element.on('nav(type)', function(elem) {
             type = elem.text();
@@ -230,6 +284,42 @@
                 }
             });
             table.resize('goods');
+        });
+        // 日期
+        laydate.render({
+            elem: '.demo-search-date'
+        });
+    
+        form.on('submit(add-member-submit)', function(data) {
+            var member_info = data.field;
+            var msg = {
+                "type": 'add',
+                "info": member_info
+            }
+            fetch('http://localhost:8889/members', {
+                method: 'Post',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(msg)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw Error('response not ok');
+                }
+                return response.json();
+            })
+            .then(rsp_data => {
+                msg = '添加成功'
+                // 显示
+                layer.msg(msg, {
+                    offset: '65px'
+                });
+            })
+            .catch(error => {
+                console.error(error);
+            })
+            return false; // 阻止默认 form 跳转
         });
     });
 </script>
